@@ -1,10 +1,10 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import spacy
 from spacy import displacy
 import requests, re
 from pathlib import Path
-# from random import sample
+from random import sample
 
 def string_insert(source_str, insert_str, pos):
     return source_str[:pos]+insert_str+source_str[pos:]
@@ -22,23 +22,32 @@ def create_annotated_text(sentence, sentence_str):
             note_idx = idx + len(token.text) + offset
             url = 'http://api.conceptnet.io/c/en/{}'.format(token.text.lower().strip('.,:;"-!?'))
             obj = requests.get(url).json()
-            note = create_note(obj)
-            sentence_str = string_insert(sentence_str, note, note_idx)
-            offset += len(note)
+            note = create_note(obj, token.text, token.idx)
+            if note:
+            	sentence_str = string_insert(sentence_str, note, note_idx)
+            	offset += len(note)
     sentence_str = sentence_str.replace("\n", "\n\n")
     return sentence_str
 
-def create_note(obj):
+def create_note(obj, word, idx):
     note = []
+    note.append("*{}*:".format(word))
     if len(obj['edges']) > 0:
-        for e in obj['edges']:
+        # try:
+        #     edges = sample(obj['edges'], 7)
+        # except ValueError:
+        edges = obj['edges']
+        for e in edges:
             if e['surfaceText'] and "translation" not in e['surfaceText']:
                 print(e['rel']['label'])
                 note_sentence = re.sub(r"\[|\]|\*", "", e['surfaceText'])
                 note_sentence = "{}.".format(note_sentence.capitalize())
                 note.append(note_sentence)
-    note = "^[{}]".format(" ".join(note))
-    return note
+        label = "{}-{}".format(word, idx)
+        if len(note) > 1:
+            note = "^[*\lineref{{{}}}*. {}]\linelabel{{{}}} ".format(label," ".join(note),label)
+            print(note)
+            return note
 
 if __name__ == '__main__':
 
@@ -54,7 +63,7 @@ if __name__ == '__main__':
     full_md = ""
     for s_idx, sentence in enumerate(sentence_spans):
 
-        filename = "img/sentence{}.svg".format(s_idx)
+        filename = "img/sentence{}.png".format(s_idx)
         # create_svg(sentence, filename)
         sentence_str = sentence.text
         sentence_str = create_annotated_text(sentence, sentence_str)
